@@ -11,57 +11,66 @@ db.createCollection("faculty");
 db.createCollection("course");
 
 // Insert some data in previous collections.
+var engineeringFaculty = db.faculty.insertOne({
+  FacultyName: "Engineering",
+  Address: "123 Main St",
+});
+
+var mathCourse = db.course.insertOne({ CourseName: "Math", FinalMark: 100 });
+var physicsCourse = db.course.insertOne({
+  CourseName: "Physics",
+  FinalMark: 95,
+});
+
 db.student.insertMany([
   {
-    FirstName: "mohamed",
-    lastName: "ahmed",
-    IsFired: false,
-    FacultyID: 1,
-    grades: [
-      { CourseID: 1, grade: 90 },
-      { CourseID: 2, grade: 80 },
-    ],
-  },
-  {
-    FirstName: "ahmed",
-    lastName: "mohamed",
-    IsFired: true,
-    FacultyID: 2,
-    grades: [
-      { CourseID: 1, grade: 70 },
-      { CourseID: 2, grade: 60 },
-    ],
-  },
-  {
     FirstName: "ali",
-    lastName: "mohamed",
+    LastName: "ibraheem",
     IsFired: false,
-    FacultyID: 1,
-    grades: [
-      { CourseID: 1, grade: 80 },
-      { CourseID: 2, grade: 70 },
+    FacultyID: engineeringFaculty.insertedId,
+    course: [
+      { CourseID: mathCourse.insertedId, grade: 85 },
+      { CourseID: physicsCourse.insertedId, grade: 90 },
     ],
   },
-]);
-
-db.faculty.insertMany([
-  { FacultyName: "Engineering", Address: "Mansoura" },
-  { FacultyName: "Computer Science", Address: "Cairo" },
-]);
-
-db.course.insertMany([
-  { CourseName: "Math", FinalMark: 95 },
-  { CourseName: "Science", FinalMark: 85 },
+  {
+    FirstName: "fatma",
+    LastName: "elzahraa",
+    IsFired: true,
+    FacultyID: engineeringFaculty.insertedId,
+    course: [
+      { CourseID: mathCourse.insertedId, grade: 78 },
+      { CourseID: physicsCourse.insertedId, grade: 95 },
+    ],
+  },
 ]);
 
 // Display each student Full Name along with his average grade in all courses.
-db.student.aggregate([
+var studentsWithAverageGrade = db.student.aggregate([
   {
-    $project: {
-      FullName: { $concat: ["$FirstName", " ", "$lastName"] },
-      averageGrade: {
-        $avg: "$grades.grade",
-      },
+    $addFields: {
+      FullName: { $concat: ["$FirstName", " ", "$LastName"] },
+    },
+  },
+  {
+    $unwind: "$course",
+  },
+  {
+    $lookup: {
+      from: "course",
+      localField: "course",
+      foreignField: "_id",
+      as: "courseInfo",
+    },
+  },
+  {
+    $unwind: "$courseInfo",
+  },
+  {
+    $group: {
+      _id: "$_id",
+      FullName: { $first: "$FullName" },
+      averageGrade: { $avg: "$courseInfo.grade" },
     },
   },
 ]);
@@ -81,22 +90,22 @@ db.course.aggregate([
 // Implement (one to many) relation between Student and Course, by adding array of Courses IDs in the student object.
 db.student.updateMany(
   {},
-  { $set: { courses: ["001", "002"] } }
+  { $set: { course: [mathCourse.insertedId, physicsCourse.insertedId] } }
 );
 
 // Select specific student with his name, and then display his courses.
 db.student.aggregate([
   {
     $match: {
-      FirstName: "John",
+      FirstName: "fatma",
     },
   },
   {
     $lookup: {
       from: "course",
-      localField: "courses",
+      localField: "course",
       foreignField: "_id",
-      as: "courses",
+      as: "course",
     },
   },
 ]);
@@ -104,14 +113,14 @@ db.student.aggregate([
 // Implement relation between Student and faculty by adding the faculty object in the student using _id Relation using $Lookup.
 db.student.updateMany(
   {},
-  { $set: { faculty: "001" } }
+  { $set: { faculty: engineeringFaculty.insertedId } }
 );
 
 // Select specific student with his name, and then display his faculty.
 db.student.aggregate([
   {
     $match: {
-      FirstName: "John",
+      FirstName: "ali",
     },
   },
   {
